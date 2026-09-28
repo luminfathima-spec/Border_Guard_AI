@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-app: #f6f5fa;
+    --bg-surface: #ffffff;
+    --bg-surface-secondary: #faf9fd;
+    --bg-surface-hover: #f0edf8;
+    --border-subtle: #e5e1ee;
+    --border-medium: #d6cfdf;
+    --text-primary: #211d2b;
+    --text-secondary: #625d6d;
+    --text-muted: #8e8899;
+    --accent-violet: #7c5cfc;
+    --accent-violet-hover: #6a46f9;
+    --accent-violet-subtle: #f0edfd;
+    --accent-violet-border: #dcd4fb;
+    --success-green: #16a34a;
+    --warning-amber: #d97706;
+    --critical-red: #d32f2f;
+  }
+
+  body {
+    background-color: #f6f5fa;
+    color: #211d2b;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: #211d2b;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+}
+
+/* Light Violet Geospatial Perimeter Grid */
+.tactical-grid-light {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(124, 92, 252, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(124, 92, 252, 0.08) 1px, transparent 1px);
+}
+
+.tactical-dots-light {
+  background-size: 20px 20px;
+  background-image: radial-gradient(circle, rgba(124, 92, 252, 0.12) 1.5px, transparent 1.5px);
+}
+
+/* Light Theme Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f6f5fa;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d4cee0;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #b5adc4;
+}
+
+/* Monospace Numbers for Timestamps & Telemetry */
+.font-mono-num {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}

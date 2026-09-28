@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Node / Frontend
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Environment & Secrets
+.env
+*.env.local
+
+# AI Models & Media Data (Large / generated files)
+models/*.pt
+models/*.onnx
+data/uploads/*
+data/processed/*
+data/evidence/*
+data/snapshots/*
+!data/uploads/.gitkeep
+!data/processed/.gitkeep
+!data/evidence/.gitkeep
+!data/snapshots/.gitkeep
+!data/uploads/sample_border_surveillance.mp4
+
+# IDEs & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
