@@ -15,6 +15,11 @@ class EventType(str, Enum):
     OBJECT_LEFT_BEHIND = "OBJECT_LEFT_BEHIND"
     CAMERA_TAMPERING = "CAMERA_TAMPERING"
     CAMERA_OFFLINE = "CAMERA_OFFLINE"
+    VIRTUAL_FENCE_BREACH = "VIRTUAL_FENCE_BREACH"
+    LOITERING_DETECTED = "LOITERING_DETECTED"
+    PERIMETER_PROXIMITY = "PERIMETER_PROXIMITY"
+    UNAUTHORIZED_CROSSING = "UNAUTHORIZED_CROSSING"
+    BREACH = "BREACH"
 
 class SeverityLevel(str, Enum):
     LOW = "LOW"
@@ -44,8 +49,15 @@ class SecurityEvent(Base):
 
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False)
 
+    # Edge Store-and-Forward / Synchronization Fields
+    client_event_id = Column(String(100), unique=True, nullable=True, index=True)
+    sync_status = Column(String(50), default="SYNCED", nullable=False, index=True)  # SYNCED, BUFFERED_EDGE, SYNC_PENDING, SYNC_FAILED
+    synced_at = Column(DateTime, nullable=True)
+    edge_node_id = Column(String(100), nullable=True, index=True)
+
     camera = relationship("Camera", back_populates="events")
     video = relationship("Video", back_populates="events")
     incident = relationship("Incident", back_populates="events")
     alerts = relationship("Alert", back_populates="event", cascade="all, delete-orphan")
     evidence_items = relationship("Evidence", back_populates="event")
+    analyses = relationship("AIAnalysis", back_populates="event")

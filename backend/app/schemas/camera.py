@@ -1,6 +1,7 @@
 import datetime
+import re
 from typing import List, Optional, Any, Dict
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from app.models.camera import CameraStatus
 
 class ZoneCoordinate(BaseModel):
@@ -53,4 +54,24 @@ class CameraResponse(CameraBase):
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
+    @field_validator("stream_url", mode="after")
+    @classmethod
+    def sanitize_stream_url(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return v
+        return re.sub(r"://([^:]+):([^@]+)@", r"://\1:****@", v)
+
     model_config = ConfigDict(from_attributes=True)
+
+class RTSPTestRequest(BaseModel):
+    stream_url: str
+    timeout_seconds: Optional[int] = 5
+
+class RTSPTestResponse(BaseModel):
+    connected: bool
+    stream_url: str
+    latency_ms: int
+    resolution: Optional[str] = None
+    fps: Optional[float] = None
+    error: Optional[str] = None
+    message: Optional[str] = None

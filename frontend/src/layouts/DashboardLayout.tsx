@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { CommandBar } from '../components/CommandBar';
 import { NavigationRail } from '../components/NavigationRail';
+import { EdgeSyncBanner } from '../components/EdgeSyncBanner';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -41,6 +42,7 @@ export function DashboardLayout({
         {/* Scrollable Main Operations Workstation Area */}
         <main className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6 bg-[#F6F5FA]">
           <div className="w-full max-w-[1920px] mx-auto space-y-6">
+            <EdgeSyncBanner />
             {children}
           </div>
         </main>

@@ -25,6 +25,11 @@ class Evidence(Base):
     timestamp = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False)
     metadata_json = Column(JSON, default=dict, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False)
+    
+    # Edge Store-and-Forward / Synchronization Fields
+    client_evidence_id = Column(String(100), unique=True, nullable=True, index=True)
+    sync_status = Column(String(50), default="SYNCED", nullable=False, index=True)
+    synced_at = Column(DateTime, nullable=True)
 
     incident = relationship("Incident", back_populates="evidence_items")
     event = relationship("SecurityEvent", back_populates="evidence_items")

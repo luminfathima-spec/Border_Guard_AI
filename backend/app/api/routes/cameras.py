@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.models.camera import Camera, CameraStatus
-from app.schemas.camera import CameraCreate, CameraUpdate, CameraResponse
+from app.schemas.camera import CameraCreate, CameraUpdate, CameraResponse, RTSPTestRequest, RTSPTestResponse
+from app.services.rtsp_service import RTSPService
 from app.api.deps import get_current_active_user, RoleChecker
 from app.models.user import User
 
@@ -98,3 +99,42 @@ def update_camera(
     db.commit()
     db.refresh(camera)
     return camera
+
+@router.post("/test-stream", response_model=RTSPTestResponse, dependencies=[Depends(RoleChecker(["ADMIN", "SECURITY_ANALYST"]))])
+def test_stream_url(
+    req: RTSPTestRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Tests an arbitrary RTSP or HTTP stream URL connection with credential masking and timeout protection.
+    """
+    result = RTSPService.test_stream_connection(req.stream_url, timeout_seconds=req.timeout_seconds)
+    return result
+
+@router.post("/{camera_id}/test-connection", response_model=RTSPTestResponse, dependencies=[Depends(RoleChecker(["ADMIN", "SECURITY_ANALYST", "OPERATOR"]))])
+def test_camera_connection(
+    camera_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Tests the configured RTSP stream URL for an existing camera and synchronizes its online/offline status.
+    """
+    camera = db.query(Camera).filter(Camera.id == camera_id).first()
+    if not camera:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Camera not found")
+
+    if not camera.stream_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Camera does not have a stream_url configured",
+        )
+
+    result = RTSPService.test_stream_connection(camera.stream_url)
+    new_status = CameraStatus.ONLINE.value if result["connected"] else CameraStatus.OFFLINE.value
+    if camera.status != new_status:
+        camera.status = new_status
+        db.commit()
+        db.refresh(camera)
+
+    return result

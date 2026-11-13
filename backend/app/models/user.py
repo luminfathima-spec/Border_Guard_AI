@@ -28,3 +28,4 @@ class User(Base):
     )
 
     audit_logs = relationship("AuditLog", back_populates="user", cascade="all, delete-orphan")
+    reports = relationship("Report", foreign_keys="[Report.generated_by_user_id]", back_populates="generated_by")

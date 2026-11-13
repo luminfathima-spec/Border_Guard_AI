@@ -10,8 +10,12 @@ import { EventsPage } from './pages/EventsPage';
 import { AlertsPage } from './pages/AlertsPage';
 import { IncidentsPage } from './pages/IncidentsPage';
 import { EvidencePage } from './pages/EvidencePage';
-import { AIAssistantPage } from './pages/AIAssistantPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
+import { VideoManagementPage } from './pages/VideoManagementPage';
+import { ReportsPage } from './pages/ReportsPage';
+import { CopilotPage } from './pages/CopilotPage';
+import { OfflineSyncPage } from './pages/OfflineSyncPage';
+import { AuditSettingsPage } from './pages/AuditSettingsPage';
 import { alertApi, incidentApi, cameraApi } from './services/sentinelApi';
 
 function AppContent() {
@@ -62,24 +66,35 @@ function AppContent() {
       case 'overview':
       case 'dashboard':
         return <DashboardPage onNavigate={setActiveTab} />;
-      case 'live-surveillance':
-      case 'monitoring':
-        return <MonitoringPage />;
       case 'cameras':
         return <CamerasPage />;
-      case 'border-zones':
-        return <BorderZonesPage />;
+      case 'monitoring':
+      case 'live-surveillance':
+        return <MonitoringPage />;
       case 'events':
         return <EventsPage />;
-      case 'alerts':
-        return <AlertsPage />;
       case 'incidents':
         return <IncidentsPage />;
-      case 'evidence':
-        return <EvidencePage />;
+      case 'reports':
+        return <ReportsPage />;
+      case 'copilot':
       case 'ai-analyst':
       case 'ai-assistant':
-        return <AIAssistantPage />;
+        return <CopilotPage />;
+      case 'offline-sync':
+      case 'edge-sync':
+        return <OfflineSyncPage />;
+      case 'audit-settings':
+      case 'settings':
+        return <AuditSettingsPage />;
+      case 'videos':
+        return <VideoManagementPage />;
+      case 'border-zones':
+        return <BorderZonesPage />;
+      case 'alerts':
+        return <AlertsPage />;
+      case 'evidence':
+        return <EvidencePage />;
       case 'analytics':
         return <AnalyticsPage />;
       default:

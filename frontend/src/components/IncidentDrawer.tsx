@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Bot, CheckCircle2, Printer, X, Send, Clock, ShieldAlert } from 'lucide-react';
-import { incidentApi, aiApi } from '../services/sentinelApi';
+import { Bot, CheckCircle2, Printer, X, Send, Clock, ShieldAlert, GitBranch, Layers } from 'lucide-react';
+import { incidentApi, aiApi, reportApi } from '../services/sentinelApi';
 import type { Incident } from '../types';
 import { SeverityBadge } from './SeverityBadge';
 import { ReportModal } from './ReportModal';
+import { EvidenceTimeline } from './EvidenceTimeline';
 
 interface IncidentDrawerProps {
   incident: Incident | null;
@@ -16,6 +17,7 @@ export function IncidentDrawer({
   onClose,
   onUpdated,
 }: IncidentDrawerProps) {
+  const [activeTab, setActiveTab] = useState<'overview' | 'timeline'>('overview');
   const [analystNotes, setAnalystNotes] = useState<string>(incident?.analyst_notes || '');
   const [summarizing, setSummarizing] = useState(false);
   const [currentIncident, setCurrentIncident] = useState<Incident | null>(incident);
@@ -55,7 +57,7 @@ export function IncidentDrawer({
 
   const handleGenerateFullReport = async () => {
     try {
-      const res = await aiApi.generateReport(incident.id);
+      const res = await reportApi.generate(incident.id);
       setReportModalData(res);
     } catch (err) {
       console.error('Failed to generate report:', err);
@@ -106,65 +108,97 @@ export function IncidentDrawer({
             </div>
           </div>
 
-          {/* Google Gemini AI Threat Reasoning Box */}
-          <div className="p-5 rounded-xl bg-[#F0EDFD] border border-[#DCD4FB] space-y-3.5 shadow-xs">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2 text-[#4328A8] font-bold text-sm">
-                <Bot className="w-5 h-5 text-[#7C5CFC]" />
-                <span>Google Gemini Cognitive Threat Assessment</span>
-              </div>
-              <button
-                onClick={handleGenerateAISummary}
-                disabled={summarizing}
-                className="px-3.5 py-1.5 rounded-lg bg-[#7C5CFC] hover:bg-[#6A46F9] text-white font-bold text-xs transition disabled:opacity-50 shadow-xs"
-              >
-                {summarizing ? 'Reasoning...' : 'Regenerate Analysis'}
-              </button>
-            </div>
-
-            <div className="text-[#211D2B] text-sm leading-relaxed bg-white p-4 rounded-lg border border-[#DCD4FB]">
-              {activeInc.ai_summary || 'No AI threat analysis generated yet. Click above to run cognitive inference.'}
-            </div>
-
-            {activeInc.ai_recommendations && activeInc.ai_recommendations.length > 0 && (
-              <div className="space-y-2 pt-1">
-                <span className="text-xs text-[#4328A8] font-bold uppercase tracking-wider">
-                  Recommended Tactical Containment Actions:
-                </span>
-                <ul className="space-y-2 text-xs sm:text-sm text-[#3E384D]">
-                  {activeInc.ai_recommendations.map((rec, idx) => (
-                    <li key={idx} className="flex items-start space-x-2">
-                      <CheckCircle2 className="w-4 h-4 text-[#7C5CFC] shrink-0 mt-0.5" />
-                      <span>{rec}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+          {/* Navigation Tabs */}
+          <div className="flex border-b border-[#E5E1EE] space-x-6 text-xs font-bold">
+            <button
+              onClick={() => setActiveTab('overview')}
+              className={`pb-2.5 flex items-center space-x-1.5 transition border-b-2 -mb-px ${
+                activeTab === 'overview'
+                  ? 'border-[#7C5CFC] text-[#7C5CFC]'
+                  : 'border-transparent text-[#8E8899] hover:text-[#211D2B]'
+              }`}
+            >
+              <Layers className="w-4 h-4" />
+              <span>Overview & AI Analysis</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('timeline')}
+              className={`pb-2.5 flex items-center space-x-1.5 transition border-b-2 -mb-px ${
+                activeTab === 'timeline'
+                  ? 'border-[#7C5CFC] text-[#7C5CFC]'
+                  : 'border-transparent text-[#8E8899] hover:text-[#211D2B]'
+              }`}
+            >
+              <GitBranch className="w-4 h-4" />
+              <span>Evidence Provenance Timeline</span>
+            </button>
           </div>
 
-          {/* Field Analyst Notes */}
-          <div className="space-y-2">
-            <div className="text-xs font-bold text-[#8E8899] uppercase tracking-wider">
-              Field Analyst Investigation Notes:
-            </div>
-            <textarea
-              rows={3}
-              value={analystNotes}
-              onChange={(e) => setAnalystNotes(e.target.value)}
-              placeholder="Record tactical intercepts, Quick Reaction Team response, radar confirmations..."
-              className="w-full p-3 bg-white border border-[#E5E1EE] rounded-lg text-[#211D2B] text-sm focus:outline-none focus:border-[#7C5CFC] leading-relaxed shadow-2xs font-sans"
-            />
-            <div className="flex justify-end">
-              <button
-                onClick={handleSaveNotes}
-                className="px-4 py-2 rounded-lg bg-[#FAF9FD] hover:bg-[#F0EDFD] border border-[#E5E1EE] text-[#4328A8] text-xs font-bold flex items-center space-x-2 transition"
-              >
-                <Send className="w-3.5 h-3.5 text-[#7C5CFC]" />
-                <span>Save Field Notes</span>
-              </button>
-            </div>
-          </div>
+          {activeTab === 'timeline' ? (
+            <EvidenceTimeline incidentId={activeInc.id} incidentNumber={activeInc.incident_number} />
+          ) : (
+            <>
+              {/* Google Gemini AI Threat Reasoning Box */}
+              <div className="p-5 rounded-xl bg-[#F0EDFD] border border-[#DCD4FB] space-y-3.5 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 text-[#4328A8] font-bold text-sm">
+                    <Bot className="w-5 h-5 text-[#7C5CFC]" />
+                    <span>Google Gemini Cognitive Threat Assessment</span>
+                  </div>
+                  <button
+                    onClick={handleGenerateAISummary}
+                    disabled={summarizing}
+                    className="px-3.5 py-1.5 rounded-lg bg-[#7C5CFC] hover:bg-[#6A46F9] text-white font-bold text-xs transition disabled:opacity-50 shadow-xs"
+                  >
+                    {summarizing ? 'Reasoning...' : 'Regenerate Analysis'}
+                  </button>
+                </div>
+
+                <div className="text-[#211D2B] text-sm leading-relaxed bg-white p-4 rounded-lg border border-[#DCD4FB]">
+                  {activeInc.ai_summary || 'No AI threat analysis generated yet. Click above to run cognitive inference.'}
+                </div>
+
+                {activeInc.ai_recommendations && activeInc.ai_recommendations.length > 0 && (
+                  <div className="space-y-2 pt-1">
+                    <span className="text-xs text-[#4328A8] font-bold uppercase tracking-wider">
+                      Recommended Tactical Containment Actions:
+                    </span>
+                    <ul className="space-y-2 text-xs sm:text-sm text-[#3E384D]">
+                      {activeInc.ai_recommendations.map((rec, idx) => (
+                        <li key={idx} className="flex items-start space-x-2">
+                          <CheckCircle2 className="w-4 h-4 text-[#7C5CFC] shrink-0 mt-0.5" />
+                          <span>{rec}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {/* Field Analyst Notes */}
+              <div className="space-y-2">
+                <div className="text-xs font-bold text-[#8E8899] uppercase tracking-wider">
+                  Field Analyst Investigation Notes:
+                </div>
+                <textarea
+                  rows={3}
+                  value={analystNotes}
+                  onChange={(e) => setAnalystNotes(e.target.value)}
+                  placeholder="Record tactical intercepts, Quick Reaction Team response, radar confirmations..."
+                  className="w-full p-3 bg-white border border-[#E5E1EE] rounded-lg text-[#211D2B] text-sm focus:outline-none focus:border-[#7C5CFC] leading-relaxed shadow-2xs font-sans"
+                />
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleSaveNotes}
+                    className="px-4 py-2 rounded-lg bg-[#FAF9FD] hover:bg-[#F0EDFD] border border-[#E5E1EE] text-[#4328A8] text-xs font-bold flex items-center space-x-2 transition"
+                  >
+                    <Send className="w-3.5 h-3.5 text-[#7C5CFC]" />
+                    <span>Save Field Notes</span>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Footer Actions */}

@@ -38,3 +38,8 @@ class Incident(Base):
     events = relationship("SecurityEvent", back_populates="incident")
     alerts = relationship("Alert", back_populates="incident")
     evidence_items = relationship("Evidence", back_populates="incident")
+    analyses = relationship("AIAnalysis", back_populates="incident", cascade="all, delete-orphan")
+    reports = relationship("Report", back_populates="incident")
+    graph_edges = relationship("EventLink", back_populates="incident", cascade="all, delete-orphan")
+    observations = relationship("EvidenceObservation", back_populates="incident", cascade="all, delete-orphan")
+

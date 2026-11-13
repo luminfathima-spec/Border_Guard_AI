@@ -1,11 +1,11 @@
 import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 from pydantic import BaseModel, ConfigDict
 from app.models.event import EventType, SeverityLevel
 
 class SecurityEventBase(BaseModel):
-    event_type: EventType
-    severity: SeverityLevel
+    event_type: Union[EventType, str]
+    severity: Union[SeverityLevel, str]
     camera_id: Optional[int] = None
     video_id: Optional[int] = None
     incident_id: Optional[int] = None

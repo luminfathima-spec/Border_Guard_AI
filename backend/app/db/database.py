@@ -47,11 +47,15 @@ def get_engine():
         import app.models.camera
         import app.models.video
         import app.models.detection
+        import app.models.track
         import app.models.event
         import app.models.alert
         import app.models.incident
         import app.models.evidence
+        import app.models.ai_analysis
+        import app.models.report
         import app.models.audit
+        import app.models.verification
         from app.db.init_db import init_db
 
         Base.metadata.create_all(bind=eng)
@@ -71,6 +75,54 @@ def get_engine():
                         if col_name not in existing_cols:
                             conn.execute(text(f"ALTER TABLE videos ADD COLUMN {col_name} {col_type}"))
                             conn.commit()
+
+                    # Check columns on ai_analyses
+                    existing_ai_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(ai_analyses)")).fetchall()]
+                    if "prompt_version" not in existing_ai_cols and len(existing_ai_cols) > 0:
+                        conn.execute(text("ALTER TABLE ai_analyses ADD COLUMN prompt_version VARCHAR(50) DEFAULT '2026.04.1'"))
+                        conn.commit()
+
+                    # Check columns on reports
+                    existing_report_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(reports)")).fetchall()]
+                    if len(existing_report_cols) > 0:
+                        for col_name, col_type in [
+                            ("review_status", "VARCHAR(50) DEFAULT 'DRAFT'"),
+                            ("approved_by_user_id", "INTEGER"),
+                            ("approved_at", "DATETIME"),
+                            ("model_name", "VARCHAR(100) DEFAULT 'gemini-2.5-flash'"),
+                            ("prompt_version", "VARCHAR(50) DEFAULT '2026.04.1'"),
+                            ("sections_json", "JSON DEFAULT '{}'"),
+                            ("human_corrections", "JSON DEFAULT '[]'"),
+                            ("audit_history", "JSON DEFAULT '[]'"),
+                        ]:
+                            if col_name not in existing_report_cols:
+                                conn.execute(text(f"ALTER TABLE reports ADD COLUMN {col_name} {col_type}"))
+                                conn.commit()
+
+                    # Check columns on security_events (Phase 8 Edge Sync)
+                    existing_ev_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(security_events)")).fetchall()]
+                    if len(existing_ev_cols) > 0:
+                        for col_name, col_type in [
+                            ("client_event_id", "VARCHAR(100)"),
+                            ("sync_status", "VARCHAR(50) DEFAULT 'SYNCED'"),
+                            ("synced_at", "DATETIME"),
+                            ("edge_node_id", "VARCHAR(100)"),
+                        ]:
+                            if col_name not in existing_ev_cols:
+                                conn.execute(text(f"ALTER TABLE security_events ADD COLUMN {col_name} {col_type}"))
+                                conn.commit()
+
+                    # Check columns on evidence (Phase 8 Edge Sync)
+                    existing_evidence_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(evidence)")).fetchall()]
+                    if len(existing_evidence_cols) > 0:
+                        for col_name, col_type in [
+                            ("client_evidence_id", "VARCHAR(100)"),
+                            ("sync_status", "VARCHAR(50) DEFAULT 'SYNCED'"),
+                            ("synced_at", "DATETIME"),
+                        ]:
+                            if col_name not in existing_evidence_cols:
+                                conn.execute(text(f"ALTER TABLE evidence ADD COLUMN {col_name} {col_type}"))
+                                conn.commit()
             except Exception as mig_err:
                 logger.warning(f"SQLite migration check notice: {mig_err}")
 

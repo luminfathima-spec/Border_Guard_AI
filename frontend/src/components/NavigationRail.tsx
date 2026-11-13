@@ -1,7 +1,8 @@
 import {
   Compass, Eye, Camera, ShieldAlert,
-  Bell, AlertTriangle, FileText, FolderArchive,
-  Bot, BarChart3, ChevronLeft, ChevronRight
+  Bell, FileText,
+  Bot, BarChart3, ChevronLeft, ChevronRight, Film,
+  Server, Settings
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -21,15 +22,16 @@ export function NavigationRail({
   const [collapsed, setCollapsed] = useState(false);
 
   const navItems = [
-    { id: 'overview', label: 'Overview', icon: Compass },
-    { id: 'live-surveillance', label: 'Live Surveillance', icon: Eye },
-    { id: 'border-zones', label: 'Border Zones', icon: ShieldAlert },
-    { id: 'cameras', label: 'Cameras', icon: Camera },
-    { id: 'events', label: 'Events', icon: Bell },
-    { id: 'alerts', label: 'Alerts', icon: AlertTriangle, badge: alertCount },
-    { id: 'incidents', label: 'Incidents', icon: FileText, badge: incidentCount },
-    { id: 'evidence', label: 'Evidence', icon: FolderArchive },
-    { id: 'ai-analyst', label: 'AI Analyst', icon: Bot },
+    { id: 'overview', label: 'Overview & Health', icon: Compass },
+    { id: 'cameras', label: 'Cameras & Sources', icon: Camera },
+    { id: 'monitoring', label: 'Video Monitoring', icon: Eye },
+    { id: 'events', label: 'Detections & Tracks', icon: Bell, badge: alertCount },
+    { id: 'incidents', label: 'Incident Graph', icon: ShieldAlert, badge: incidentCount },
+    { id: 'reports', label: 'Gemini Reports', icon: FileText },
+    { id: 'copilot', label: 'Surveillance Copilot', icon: Bot },
+    { id: 'offline-sync', label: 'Offline Sync Status', icon: Server },
+    { id: 'audit-settings', label: 'Audit & Settings', icon: Settings },
+    { id: 'videos', label: 'Video Ingestion', icon: Film },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
   ];
 
@@ -56,8 +58,11 @@ export function NavigationRail({
           const isActive =
             activeTab === item.id ||
             (activeTab === 'dashboard' && item.id === 'overview') ||
-            (activeTab === 'monitoring' && item.id === 'live-surveillance') ||
-            (activeTab === 'ai-assistant' && item.id === 'ai-analyst');
+            (activeTab === 'live-surveillance' && item.id === 'monitoring') ||
+            (activeTab === 'ai-assistant' && item.id === 'copilot') ||
+            (activeTab === 'ai-analyst' && item.id === 'copilot') ||
+            (activeTab === 'edge-sync' && item.id === 'offline-sync') ||
+            (activeTab === 'settings' && item.id === 'audit-settings');
 
           return (
             <button

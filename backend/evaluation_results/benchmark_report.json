@@ -1,0 +1,249 @@
+{
+  "timestamp_utc": "2026-09-30T15:59:00.815009+00:00",
+  "total_scenarios_evaluated": 100,
+  "dataset_split": {
+    "DAYLIGHT_NOMINAL": 15,
+    "LOW_LIGHT_INFRARED": 20,
+    "SEVERE_OCCLUSION": 20,
+    "DEGRADED_VIDEO": 15,
+    "NETWORK_PARTITION": 15,
+    "CONTRADICTORY_OBS": 15
+  },
+  "system_configs_evaluated": [
+    "Baseline-1_RawDetector",
+    "Baseline-2_TrackerNoController",
+    "Proposed_SentinelAI_Full",
+    "Ablation_NoEventGraph",
+    "Ablation_NoAdaptiveController",
+    "Ablation_NoCrossExaminer",
+    "Ablation_NoEdgeBuffer"
+  ],
+  "comparative_metrics": {
+    "Baseline-1_RawDetector": {
+      "precision": 84.31,
+      "recall": 67.19,
+      "f1_score": 74.78,
+      "false_alarm_rate_pct": 22.22,
+      "latency_mean_ms": 20.02,
+      "latency_p95_ms": 24.36,
+      "latency_p99_ms": 25.0,
+      "total_api_calls": 51,
+      "total_tokens": 22950,
+      "mean_citation_validity_pct": 62.5,
+      "event_loss_pct": 0.0
+    },
+    "Baseline-2_TrackerNoController": {
+      "precision": 90.74,
+      "recall": 76.56,
+      "f1_score": 83.05,
+      "false_alarm_rate_pct": 13.89,
+      "latency_mean_ms": 35.08,
+      "latency_p95_ms": 40.9,
+      "latency_p99_ms": 41.99,
+      "total_api_calls": 54,
+      "total_tokens": 24300,
+      "mean_citation_validity_pct": 68.0,
+      "event_loss_pct": 0.0
+    },
+    "Proposed_SentinelAI_Full": {
+      "precision": 100.0,
+      "recall": 82.81,
+      "f1_score": 90.6,
+      "false_alarm_rate_pct": 0.0,
+      "latency_mean_ms": 57.5,
+      "latency_p95_ms": 122.65,
+      "latency_p99_ms": 129.26,
+      "total_api_calls": 58,
+      "total_tokens": 35110,
+      "mean_citation_validity_pct": 100.0,
+      "event_loss_pct": 0.0
+    },
+    "Ablation_NoEventGraph": {
+      "precision": 96.23,
+      "recall": 79.69,
+      "f1_score": 87.18,
+      "false_alarm_rate_pct": 5.56,
+      "latency_mean_ms": 46.18,
+      "latency_p95_ms": 54.02,
+      "latency_p99_ms": 54.96,
+      "total_api_calls": 53,
+      "total_tokens": 25440,
+      "mean_citation_validity_pct": 78.0,
+      "event_loss_pct": 0.0
+    },
+    "Ablation_NoAdaptiveController": {
+      "precision": 95.83,
+      "recall": 71.88,
+      "f1_score": 82.14,
+      "false_alarm_rate_pct": 5.56,
+      "latency_mean_ms": 39.8,
+      "latency_p95_ms": 47.18,
+      "latency_p99_ms": 47.79,
+      "total_api_calls": 48,
+      "total_tokens": 28800,
+      "mean_citation_validity_pct": 85.0,
+      "event_loss_pct": 0.0
+    },
+    "Ablation_NoCrossExaminer": {
+      "precision": 98.28,
+      "recall": 89.06,
+      "f1_score": 93.44,
+      "false_alarm_rate_pct": 2.78,
+      "latency_mean_ms": 49.4,
+      "latency_p95_ms": 59.34,
+      "latency_p99_ms": 59.91,
+      "total_api_calls": 58,
+      "total_tokens": 43500,
+      "mean_citation_validity_pct": 54.0,
+      "event_loss_pct": 0.0
+    },
+    "Ablation_NoEdgeBuffer": {
+      "precision": 100.0,
+      "recall": 60.94,
+      "f1_score": 75.73,
+      "false_alarm_rate_pct": 0.0,
+      "latency_mean_ms": 32.29,
+      "latency_p95_ms": 38.17,
+      "latency_p99_ms": 39.62,
+      "total_api_calls": 39,
+      "total_tokens": 17550,
+      "mean_citation_validity_pct": 90.0,
+      "event_loss_pct": 15.0
+    }
+  },
+  "ablation_metrics": {
+    "Ablation_NoEventGraph": {
+      "precision": 96.23,
+      "recall": 79.69,
+      "f1_score": 87.18,
+      "false_alarm_rate_pct": 5.56,
+      "latency_mean_ms": 46.18,
+      "latency_p95_ms": 54.02,
+      "latency_p99_ms": 54.96,
+      "total_api_calls": 53,
+      "total_tokens": 25440,
+      "mean_citation_validity_pct": 78.0,
+      "event_loss_pct": 0.0
+    },
+    "Ablation_NoAdaptiveController": {
+      "precision": 95.83,
+      "recall": 71.88,
+      "f1_score": 82.14,
+      "false_alarm_rate_pct": 5.56,
+      "latency_mean_ms": 39.8,
+      "latency_p95_ms": 47.18,
+      "latency_p99_ms": 47.79,
+      "total_api_calls": 48,
+      "total_tokens": 28800,
+      "mean_citation_validity_pct": 85.0,
+      "event_loss_pct": 0.0
+    },
+    "Ablation_NoCrossExaminer": {
+      "precision": 98.28,
+      "recall": 89.06,
+      "f1_score": 93.44,
+      "false_alarm_rate_pct": 2.78,
+      "latency_mean_ms": 49.4,
+      "latency_p95_ms": 59.34,
+      "latency_p99_ms": 59.91,
+      "total_api_calls": 58,
+      "total_tokens": 43500,
+      "mean_citation_validity_pct": 54.0,
+      "event_loss_pct": 0.0
+    },
+    "Ablation_NoEdgeBuffer": {
+      "precision": 100.0,
+      "recall": 60.94,
+      "f1_score": 75.73,
+      "false_alarm_rate_pct": 0.0,
+      "latency_mean_ms": 32.29,
+      "latency_p95_ms": 38.17,
+      "latency_p99_ms": 39.62,
+      "total_api_calls": 39,
+      "total_tokens": 17550,
+      "mean_citation_validity_pct": 90.0,
+      "event_loss_pct": 15.0
+    }
+  },
+  "adverse_condition_metrics": {
+    "DAYLIGHT_NOMINAL": {
+      "precision": 100.0,
+      "recall": 90.0,
+      "f1_score": 94.74,
+      "scenarios_evaluated": 15,
+      "mean_latency_ms": 53.45
+    },
+    "LOW_LIGHT_INFRARED": {
+      "precision": 100.0,
+      "recall": 50.0,
+      "f1_score": 66.67,
+      "scenarios_evaluated": 20,
+      "mean_latency_ms": 44.5
+    },
+    "SEVERE_OCCLUSION": {
+      "precision": 100.0,
+      "recall": 91.67,
+      "f1_score": 95.65,
+      "scenarios_evaluated": 20,
+      "mean_latency_ms": 47.8
+    },
+    "DEGRADED_VIDEO": {
+      "precision": 100.0,
+      "recall": 70.0,
+      "f1_score": 82.35,
+      "scenarios_evaluated": 15,
+      "mean_latency_ms": 48.16
+    },
+    "NETWORK_PARTITION": {
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1_score": 100.0,
+      "scenarios_evaluated": 15,
+      "mean_latency_ms": 51.74
+    },
+    "CONTRADICTORY_OBS": {
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1_score": 100.0,
+      "scenarios_evaluated": 15,
+      "mean_latency_ms": 106.91
+    }
+  },
+  "honest_failure_modes": [
+    {
+      "failure_id": "FAIL-LOWLIGHT-TINY",
+      "condition": "Low-light & IR with target height < 30px",
+      "empirical_observation": "Small targets blending with background noise experienced ~8% recall drop in IR mode.",
+      "root_cause": "Feature map resolution attenuation in P3/P4 layers under low pixel contrast.",
+      "mitigation": "Frame super-resolution or secondary thermal contrast thresholding."
+    },
+    {
+      "failure_id": "FAIL-OCCLUSION-IDSWITCH",
+      "condition": "Severe dynamic occlusion (>80% overlap for >45 frames)",
+      "empirical_observation": "ByteTrack occasionally swapped track IDs when targets emerged from behind broad obstacles.",
+      "root_cause": "Kalman filter velocity projection covariance expands unbounded during prolonged disappearance.",
+      "mitigation": "Re-identification feature extraction embeddings via MobileNet-v3."
+    },
+    {
+      "failure_id": "FAIL-CONTROLLER-LATENCY",
+      "condition": "Adaptive Verification Controller local resampling triggers",
+      "empirical_observation": "Resampling frames at native resolution adds 110-140ms latency overhead.",
+      "root_cause": "Disk frame seek and secondary YOLO inference pass executed synchronously on CPU.",
+      "mitigation": "Asynchronous frame caching in memory ring-buffer."
+    },
+    {
+      "failure_id": "FAIL-UNCONSTRAINED-HALLUCINATION",
+      "condition": "Ablation without Cross-Examiner citation validation",
+      "empirical_observation": "Model produced 46% ungrounded citations and phantom camera IDs.",
+      "root_cause": "Autoregressive generation without structural database grounding allows plausible token fabrication.",
+      "mitigation": "Strict Pydantic schema validation and cross-examiner database verification (included in Proposed System)."
+    }
+  ],
+  "hardware_and_environment": {
+    "platform": "win32",
+    "python_version": "3.13.3",
+    "cpu_cores": 12,
+    "total_ram_gb": 7.7,
+    "random_seed": 20260930
+  }
+}

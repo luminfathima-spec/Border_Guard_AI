@@ -1,4 +1,5 @@
 import os
+import datetime
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
@@ -7,19 +8,27 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.core.config import settings
+from app.core.config import settings, SecurityConfigurationError
 from app.core.logging import setup_logging, logger
 from app.db.database import engine, Base, SessionLocal
 from app.db.init_db import init_db
 from app.api.routes import (
     health, auth, users, cameras, videos, detections,
-    events, alerts, incidents, evidence, analytics, ai
+    events, alerts, incidents, evidence, analytics, ai,
+    event_graph, verification, reports, edge, audit
 )
 
 setup_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Enforce fail-fast security validation on startup
+    try:
+        settings.validate_production_secrets()
+    except SecurityConfigurationError as sec_err:
+        logger.critical(f"FATAL SECURITY CONFIGURATION ERROR: {sec_err}")
+        raise
+
     logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION} [{settings.APP_ENV}]...")
     for dir_path in [
         settings.get_absolute_path(settings.UPLOAD_DIR),
@@ -28,6 +37,7 @@ async def lifespan(app: FastAPI):
         settings.get_absolute_path(settings.SNAPSHOTS_DIR),
         settings.get_absolute_path("models"),
         settings.get_absolute_path("data"),
+        settings.get_absolute_path("data/reports"),
         settings.get_absolute_path("demo_videos"),
     ]:
         os.makedirs(dir_path, exist_ok=True)
@@ -39,11 +49,15 @@ async def lifespan(app: FastAPI):
         import app.models.camera
         import app.models.video
         import app.models.detection
+        import app.models.track
         import app.models.event
         import app.models.alert
         import app.models.incident
         import app.models.evidence
+        import app.models.ai_analysis
+        import app.models.report
         import app.models.audit
+        import app.models.verification
 
         Base.metadata.create_all(bind=engine)
         db = SessionLocal()
@@ -82,7 +96,13 @@ app.add_middleware(
 async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
     return JSONResponse(
         status_code=exc.status_code,
-        content={"detail": exc.detail, "status_code": exc.status_code},
+        content={
+            "detail": exc.detail,
+            "status_code": exc.status_code,
+            "error_code": "HTTP_ERROR",
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "path": request.url.path,
+        },
     )
 
 @app.exception_handler(RequestValidationError)
@@ -90,8 +110,15 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     errors = exc.errors()
     logger.warning(f"Validation error on {request.url.path}: {errors}")
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={"detail": "Input validation error", "errors": errors},
+        status_code=getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", status.HTTP_422_UNPROCESSABLE_ENTITY),
+        content={
+            "detail": "Input validation error",
+            "status_code": 422,
+            "error_code": "VALIDATION_ERROR",
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "path": request.url.path,
+            "errors": errors,
+        },
     )
 
 @app.exception_handler(Exception)
@@ -99,7 +126,13 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled server error on {request.url.path}: {exc}", exc_info=True)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "An internal surveillance platform error occurred. Please contact SOC operations."},
+        content={
+            "detail": "An internal surveillance platform error occurred. Please contact SOC operations.",
+            "status_code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "error_code": "INTERNAL_SERVER_ERROR",
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "path": request.url.path,
+        },
     )
 
 # Mount static media directories
@@ -131,9 +164,14 @@ app.include_router(detections.router, prefix=settings.API_V1_PREFIX)
 app.include_router(events.router, prefix=settings.API_V1_PREFIX)
 app.include_router(alerts.router, prefix=settings.API_V1_PREFIX)
 app.include_router(incidents.router, prefix=settings.API_V1_PREFIX)
+app.include_router(event_graph.router, prefix=settings.API_V1_PREFIX)
 app.include_router(evidence.router, prefix=settings.API_V1_PREFIX)
 app.include_router(analytics.router, prefix=settings.API_V1_PREFIX)
 app.include_router(ai.router, prefix=settings.API_V1_PREFIX)
+app.include_router(verification.router, prefix=settings.API_V1_PREFIX)
+app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
+app.include_router(edge.router, prefix=settings.API_V1_PREFIX)
+app.include_router(audit.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/")
 def root():

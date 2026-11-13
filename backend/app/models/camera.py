@@ -36,5 +36,6 @@ class Camera(Base):
     )
 
     videos = relationship("Video", back_populates="camera")
+    tracks = relationship("ObjectTrack", back_populates="camera")
     events = relationship("SecurityEvent", back_populates="camera")
     alerts = relationship("Alert", back_populates="camera")

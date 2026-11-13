@@ -32,10 +32,15 @@ class Video(Base):
     
     camera_id = Column(Integer, ForeignKey("cameras.id", ondelete="SET NULL"), nullable=True)
 
+    checksum_sha256 = Column(String(64), nullable=True) # Cryptographic hash for evidentiary chain of custody
+    source_timestamp = Column(DateTime, nullable=True) # Recorded time from CCTV source metadata
+    mime_type = Column(String(100), nullable=True)
+
     processing_started_at = Column(DateTime, nullable=True)
     processing_completed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), nullable=False)
 
     camera = relationship("Camera", back_populates="videos")
     detections = relationship("Detection", back_populates="video", cascade="all, delete-orphan")
+    tracks = relationship("ObjectTrack", back_populates="video", cascade="all, delete-orphan")
     events = relationship("SecurityEvent", back_populates="video")

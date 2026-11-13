@@ -12,6 +12,12 @@ from app.models.camera import Camera
 from app.models.alert import Alert
 from app.models.evidence import Evidence
 from app.models.audit import AuditLog
+from app.models.ai_analysis import AIAnalysis, AnalysisStatus
+from app.services.gemini.prompts import PROMPT_VERSION, SYSTEM_INSTRUCTION, build_incident_prompt
+from app.services.gemini.client import get_gemini_client
+from app.services.gemini.cross_examiner import CrossExaminer
+from app.services.gemini.frame_selector import EventTriggeredFrameSelector
+from app.services.edge.network_controller import NetworkStateController
 
 class GeminiService:
     @staticmethod
@@ -19,9 +25,51 @@ class GeminiService:
         return bool(settings.GEMINI_API_KEY and len(settings.GEMINI_API_KEY.strip()) > 5)
 
     @classmethod
+    def verify_gemini_connection(cls) -> Dict[str, Any]:
+        """
+        Diagnostic probe to test Google Gemini API configuration and live connectivity.
+        Reports exact status, model name, and error categorization without leaking secrets.
+        """
+        if not cls.is_configured():
+            return {
+                "configured": False,
+                "status": "BLOCKED_NO_KEY",
+                "message": "Live Gemini verification blocked: GEMINI_API_KEY is not configured.",
+                "model_name": settings.GEMINI_MODEL,
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "is_live_success": False,
+                "is_mock": True,
+            }
+
+        try:
+            from app.services.gemini.client import RealGeminiClient
+            real_client = RealGeminiClient()
+            probe_result = real_client.ping_connectivity()
+            probe_result["configured"] = True
+            probe_result["timestamp"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            return probe_result
+        except Exception as e:
+            from app.services.gemini.client import RealGeminiClient
+            category = RealGeminiClient.categorize_error(e)
+            sanitized_msg = str(e)
+            if settings.GEMINI_API_KEY and len(settings.GEMINI_API_KEY.strip()) > 5:
+                sanitized_msg = sanitized_msg.replace(settings.GEMINI_API_KEY.strip(), "[REDACTED_API_KEY]")
+            logger.error(f"Live Gemini connectivity verification failed ({category}): {sanitized_msg}")
+            return {
+                "configured": True,
+                "status": "FAILED",
+                "error_category": category,
+                "message": f"Live Gemini request failed: {sanitized_msg}",
+                "model_name": settings.GEMINI_MODEL,
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "is_live_success": False,
+                "is_mock": False,
+            }
+
+    @classmethod
     def _call_gemini_api(cls, prompt: str, system_instruction: Optional[str] = None) -> Optional[str]:
         """
-        Executes generation using the official Google GenAI Python SDK.
+        Executes text generation using the official Google GenAI Python SDK if configured.
         """
         if not cls.is_configured():
             return None
@@ -30,7 +78,10 @@ class GeminiService:
             from google import genai
             from google.genai import types
 
-            client = genai.Client(api_key=settings.GEMINI_API_KEY)
+            client = genai.Client(
+                api_key=settings.GEMINI_API_KEY,
+                http_options=types.HttpOptions(timeout=30000),
+            )
             config = types.GenerateContentConfig(
                 temperature=0.2,
                 top_p=0.95,
@@ -46,8 +97,263 @@ class GeminiService:
             )
             return response.text
         except Exception as e:
-            logger.error(f"Google Gemini API error: {e}", exc_info=True)
+            err_msg = str(e)
+            if settings.GEMINI_API_KEY and len(settings.GEMINI_API_KEY.strip()) > 5:
+                err_msg = err_msg.replace(settings.GEMINI_API_KEY.strip(), "[REDACTED_API_KEY]")
+            logger.error(f"Google Gemini API error: {err_msg}", exc_info=True)
             return None
+
+    @classmethod
+    def analyze_incident(
+        cls,
+        db: Session,
+        incident_id: int,
+        custom_instructions: Optional[str] = None,
+        force_mock: bool = False,
+        include_keyframes: bool = True,
+        inject_hallucination: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Orchestrates full Phase 5 Gemini Intelligence Workflow:
+        1. Queries PostgreSQL for verified sensor facts, camera IDs, events, and evidence.
+        2. Selects relevant event-triggered keyframes.
+        3. Formulates a versioned, privacy-sanitized prompt.
+        4. Calls Google Gemini (or MockGeminiClient) enforcing JSON schema compliance.
+        5. Runs CrossExaminer Evidence Safeguard to quarantine ungrounded claims.
+        6. Persists structured AIAnalysis record and links to the Provenance Event Graph.
+        """
+        incident = db.query(Incident).filter(Incident.id == incident_id).first()
+        if not incident:
+            raise ValueError(f"Incident {incident_id} not found")
+
+        # Phase 8: Explicit Offline and Unreachable Handling (Zero Fabrication)
+        if NetworkStateController.is_offline():
+            status_val = AnalysisStatus.PENDING_NETWORK.value
+            ai_record = AIAnalysis(
+                incident_id=incident.id,
+                model_name=settings.GEMINI_MODEL,
+                prompt_type="STRUCTURED_INCIDENT_ANALYSIS",
+                prompt_version=PROMPT_VERSION,
+                raw_prompt="[PROMPT_BUFFERED_OFFLINE]",
+                analysis_result="AI reasoning is PENDING: external Google Gemini service unreachable during edge network outage.",
+                structured_output={
+                    "status": status_val,
+                    "pending": True,
+                    "reason": "Edge network is currently OFFLINE.",
+                    "suggested_human_actions": ["Wait for edge network reconnection", "Inspect local CCTV camera telemetry"],
+                },
+                confidence_score=0.0,
+                grounded_citations={},
+                token_count=0,
+                execution_time_ms=0,
+                status=status_val,
+                created_at=datetime.datetime.now(datetime.timezone.utc),
+            )
+            db.add(ai_record)
+            db.commit()
+            db.refresh(ai_record)
+            return {
+                "id": ai_record.id,
+                "analysis_id": ai_record.id,
+                "incident_id": incident.id,
+                "model_name": ai_record.model_name,
+                "prompt_type": ai_record.prompt_type,
+                "prompt_version": ai_record.prompt_version,
+                "analysis_result": ai_record.analysis_result,
+                "summary": ai_record.analysis_result,
+                "structured_output": ai_record.structured_output,
+                "grounded_citations": {},
+                "confidence_score": 0.0,
+                "token_count": 0,
+                "execution_time_ms": 0,
+                "status": status_val,
+                "is_mock": False,
+                "is_pending": True,
+                "created_at": ai_record.created_at,
+            }
+
+        if settings.EDGE_MODE and not cls.is_configured() and not force_mock:
+            status_val = AnalysisStatus.UNAVAILABLE.value
+            ai_record = AIAnalysis(
+                incident_id=incident.id,
+                model_name=settings.GEMINI_MODEL,
+                prompt_type="STRUCTURED_INCIDENT_ANALYSIS",
+                prompt_version=PROMPT_VERSION,
+                raw_prompt="[SERVICE_UNAVAILABLE]",
+                analysis_result="AI reasoning UNAVAILABLE: Google Gemini API key is not configured on this edge node.",
+                structured_output={
+                    "status": status_val,
+                    "unavailable": True,
+                    "suggested_human_actions": ["Deploy cloud synchronization bridge", "Configure edge API key credentials"],
+                },
+                confidence_score=0.0,
+                grounded_citations={},
+                token_count=0,
+                execution_time_ms=0,
+                status=status_val,
+                created_at=datetime.datetime.now(datetime.timezone.utc),
+            )
+            db.add(ai_record)
+            db.commit()
+            db.refresh(ai_record)
+            return {
+                "id": ai_record.id,
+                "analysis_id": ai_record.id,
+                "incident_id": incident.id,
+                "model_name": ai_record.model_name,
+                "prompt_type": ai_record.prompt_type,
+                "prompt_version": ai_record.prompt_version,
+                "analysis_result": ai_record.analysis_result,
+                "summary": ai_record.analysis_result,
+                "structured_output": ai_record.structured_output,
+                "grounded_citations": {},
+                "confidence_score": 0.0,
+                "token_count": 0,
+                "execution_time_ms": 0,
+                "status": status_val,
+                "is_mock": False,
+                "is_unavailable": True,
+                "created_at": ai_record.created_at,
+            }
+
+        events = (
+            db.query(SecurityEvent)
+            .filter(SecurityEvent.incident_id == incident_id)
+            .order_by(SecurityEvent.timestamp.asc())
+            .all()
+        )
+        alerts = db.query(Alert).filter(Alert.incident_id == incident_id).all()
+        evidence_items = db.query(Evidence).filter(Evidence.incident_id == incident_id).all()
+
+        # 1. Event-Triggered Multimodal Keyframe Selection
+        keyframes: List[bytes] = []
+        if include_keyframes:
+            try:
+                keyframes = EventTriggeredFrameSelector.select_incident_keyframes(db, incident_id, max_frames=3)
+            except Exception as kf_err:
+                logger.warning(f"Keyframe selection notice for incident {incident_id}: {kf_err}")
+
+        # 2. Extract primary camera ID
+        primary_cam_id = None
+        if events and events[0].camera_id:
+            primary_cam_id = events[0].camera_id
+        elif alerts and alerts[0].camera_id:
+            primary_cam_id = alerts[0].camera_id
+
+        # 3. Assemble structured sensor telemetry
+        facts = {
+            "incident_id": incident.id,
+            "incident_number": incident.incident_number,
+            "title": incident.title,
+            "severity": incident.severity,
+            "camera_id": primary_cam_id,
+            "created_at": incident.created_at.isoformat() if incident.created_at else datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "events_count": len(events),
+            "events": [
+                {
+                    "id": ev.id,
+                    "type": ev.event_type,
+                    "severity": ev.severity,
+                    "timestamp": ev.timestamp.isoformat() if ev.timestamp else "",
+                    "description": ev.description,
+                    "confidence": ev.confidence,
+                }
+                for ev in events
+            ],
+            "evidence_items": [
+                {
+                    "id": ev.id,
+                    "evidence_type": ev.evidence_type,
+                    "file_path": ev.file_path,
+                    "checksum": ev.checksum_sha256,
+                }
+                for ev in evidence_items
+            ],
+            "alerts": [
+                {"id": a.id, "title": a.title, "severity": a.severity, "status": a.status}
+                for a in alerts
+            ],
+            "evidence_items_count": len(evidence_items),
+        }
+
+        # 4. Construct Versioned Prompt
+        prompt = build_incident_prompt(facts, custom_instructions)
+
+        # 5. Invoke Gemini Client (Real or Mock)
+        client = get_gemini_client(force_mock=force_mock, inject_hallucination=inject_hallucination)
+        structured_obj, metadata = client.generate_structured_analysis(
+            prompt=prompt,
+            images=keyframes if keyframes else None,
+            system_instruction=SYSTEM_INSTRUCTION,
+        )
+
+        # 6. Execute Deterministic Cross-Examiner Safeguard
+        audit, status_str = CrossExaminer.verify(db, structured_obj, incident_id)
+
+        # 7. Persist AI Analysis Record
+        ai_record = AIAnalysis(
+            incident_id=incident.id,
+            model_name=metadata["model_name"],
+            prompt_type="STRUCTURED_INCIDENT_ANALYSIS",
+            prompt_version=PROMPT_VERSION,
+            raw_prompt=prompt,
+            analysis_result=structured_obj.summary,
+            structured_output=structured_obj.model_dump(),
+            confidence_score=audit.grounding_score,
+            grounded_citations=audit.model_dump(),
+            token_count=metadata.get("token_count", 0),
+            execution_time_ms=metadata.get("execution_time_ms", 0),
+            status=status_str,
+            created_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+        db.add(ai_record)
+        db.commit()
+        db.refresh(ai_record)
+
+        # 8. Link in Provenance Event Graph (EventLink)
+        try:
+            from app.models.event_graph import EventLink
+            edge = EventLink(
+                incident_id=incident.id,
+                source_node_type="AI_ANALYSIS",
+                source_node_id=ai_record.id,
+                target_node_type="INCIDENT",
+                target_node_id=incident.id,
+                relationship_type="ANALYZED_BY",
+                provenance_type="DERIVED_SYNTHESIS",
+                creation_reason=f"Gemini structured tactical incident analysis (v{PROMPT_VERSION})",
+                confidence=audit.grounding_score,
+                source_timestamp=ai_record.created_at,
+                target_timestamp=incident.created_at,
+            )
+            db.add(edge)
+            db.commit()
+        except Exception as edge_err:
+            logger.warning(f"EventLink creation notice: {edge_err}")
+
+        # 9. Update Incident with Verified Output
+        incident.ai_summary = structured_obj.summary
+        incident.ai_recommendations = structured_obj.suggested_human_actions
+        incident.ai_last_generated_at = datetime.datetime.now(datetime.timezone.utc)
+        db.commit()
+        db.refresh(incident)
+
+        return {
+            "id": ai_record.id,
+            "incident_id": incident.id,
+            "model_name": metadata["model_name"],
+            "prompt_type": ai_record.prompt_type,
+            "prompt_version": ai_record.prompt_version,
+            "analysis_result": ai_record.analysis_result,
+            "structured_output": structured_obj.model_dump(),
+            "grounded_citations": audit.model_dump(),
+            "confidence_score": audit.grounding_score,
+            "token_count": ai_record.token_count,
+            "execution_time_ms": ai_record.execution_time_ms,
+            "status": ai_record.status,
+            "is_mock": metadata.get("is_mock", False),
+            "created_at": ai_record.created_at,
+        }
 
     @classmethod
     def generate_incident_summary(
@@ -57,115 +363,17 @@ class GeminiService:
         custom_instructions: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Generates tactical incident assessment and investigation recommendations using structured event telemetry.
+        Backward-compatible wrapper returning AISummaryResponse format backed by the full Phase 5 pipeline.
         """
+        detailed = cls.analyze_incident(db, incident_id, custom_instructions=custom_instructions)
         incident = db.query(Incident).filter(Incident.id == incident_id).first()
-        if not incident:
-            raise ValueError(f"Incident {incident_id} not found")
-
-        events = db.query(SecurityEvent).filter(SecurityEvent.incident_id == incident_id).all()
-        alerts = db.query(Alert).filter(Alert.incident_id == incident_id).all()
-        evidence_items = db.query(Evidence).filter(Evidence.incident_id == incident_id).all()
-
-        # Build structured fact payload
-        facts = {
-            "incident_number": incident.incident_number,
-            "title": incident.title,
-            "severity": incident.severity,
-            "created_at": incident.created_at.isoformat(),
-            "events_count": len(events),
-            "events": [
-                {
-                    "type": ev.event_type,
-                    "severity": ev.severity,
-                    "timestamp": ev.timestamp.isoformat(),
-                    "description": ev.description,
-                    "confidence": ev.confidence,
-                    "metadata": ev.metadata_json,
-                }
-                for ev in events
-            ],
-            "alerts": [
-                {"title": a.title, "severity": a.severity, "status": a.status}
-                for a in alerts
-            ],
-            "evidence_items_count": len(evidence_items),
-        }
-
-        system_instruction = (
-            "You are SentinelAI Cognitive Reasoning Officer, an elite military and border surveillance "
-            "intelligence analysis system. Your role is to analyze deterministic computer-vision facts "
-            "(zone intrusions, line crossing tripwires, loitering times) and generate a concise tactical "
-            "executive summary, threat level evaluation, and 3-4 numbered operational recommendations. "
-            "Never invent facts not present in telemetry. Format output clearly in Markdown."
-        )
-
-        prompt = f"""
-Analyze the following structured border surveillance telemetry data:
-```json
-{json.dumps(facts, indent=2)}
-```
-
-Additional Operator Instructions: {custom_instructions or 'Provide rapid tactical analysis.'}
-
-Please output your response in valid JSON with exactly two fields:
-1. "summary": A concise, military/security-grade Markdown summary of the incident.
-2. "recommendations": A list of 3-4 actionable operational steps for field security teams.
-"""
-
-        gemini_response_text = cls._call_gemini_api(prompt, system_instruction)
-        model_used = settings.GEMINI_MODEL if gemini_response_text else "Heuristic Rule-Based Fallback"
-
-        if gemini_response_text:
-            try:
-                # Clean potential markdown JSON formatting
-                cleaned_text = gemini_response_text.strip()
-                if cleaned_text.startswith("```json"):
-                    cleaned_text = cleaned_text[7:]
-                if cleaned_text.startswith("```"):
-                    cleaned_text = cleaned_text[3:]
-                if cleaned_text.endswith("```"):
-                    cleaned_text = cleaned_text[:-3]
-
-                parsed = json.loads(cleaned_text.strip())
-                summary = parsed.get("summary", gemini_response_text)
-                recommendations = parsed.get("recommendations", [])
-            except Exception:
-                summary = gemini_response_text
-                recommendations = [
-                    "Dispatch Quick Reaction Team (QRT) to verify sector integrity.",
-                    "Review secondary surveillance feeds and thermal cameras.",
-                    "Log suspect trajectory in national border surveillance ledger."
-                ]
-        else:
-            # High quality deterministic heuristic fallback
-            summary = (
-                f"**[Automated Intelligence Assessment]** Incident `{incident.incident_number}` represents a "
-                f"**{incident.severity}** severity security event. Computer vision detected {len(events)} correlated breach "
-                f"event(s). Breaches include: {', '.join(set(e.event_type for e in events))}. Immediate perimeter cordon "
-                f"and active verification is advised."
-            )
-            recommendations = [
-                "Deploy Quick Reaction Team (QRT) to intercept intrusion coordinates.",
-                "Review recorded high-resolution evidence clips and snapshot forensic metadata.",
-                "Inspect adjacent sector tripwires for coordinated secondary breach attempts.",
-                "Escalate incident severity in SOC if target identity remains unconfirmed."
-            ]
-
-        # Update Incident in Database
-        incident.ai_summary = summary
-        incident.ai_recommendations = recommendations
-        incident.ai_last_generated_at = datetime.datetime.now(datetime.timezone.utc)
-        db.commit()
-        db.refresh(incident)
-
         return {
-            "incident_id": incident.id,
-            "incident_number": incident.incident_number,
-            "ai_summary": summary,
-            "ai_recommendations": recommendations,
-            "model_used": model_used,
-            "source_facts": facts,
+            "incident_id": detailed["incident_id"],
+            "incident_number": incident.incident_number if incident else f"INC-{incident_id}",
+            "ai_summary": detailed["analysis_result"],
+            "ai_recommendations": detailed["structured_output"].get("suggested_human_actions", []),
+            "model_used": detailed["model_name"],
+            "source_facts": detailed["grounded_citations"],
         }
 
     @classmethod

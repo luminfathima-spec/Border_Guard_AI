@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Bot, CheckCircle2, Printer, RefreshCw, Send, Clock
 } from 'lucide-react';
-import { incidentApi, aiApi } from '../services/sentinelApi';
+import { incidentApi, aiApi, reportApi } from '../services/sentinelApi';
 import type { Incident } from '../types';
 import { SeverityBadge } from '../components/SeverityBadge';
 import { ReportModal } from '../components/ReportModal';
@@ -74,7 +74,7 @@ export function IncidentsPage() {
   const handleGenerateFullReport = async () => {
     if (!selectedIncident) return;
     try {
-      const res = await aiApi.generateReport(selectedIncident.id);
+      const res = await reportApi.generate(selectedIncident.id);
       setReportModalData(res);
     } catch (err) {
       console.error('Failed to generate report:', err);

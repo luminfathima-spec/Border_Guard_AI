@@ -1,19 +1,35 @@
 import { X, Printer, Shield, CheckCircle2 } from 'lucide-react';
+import type { ReportResponse } from '../types';
+import { EvidenceGroundedReportViewer } from './EvidenceGroundedReportViewer';
 
-interface ReportModalProps {
-  report: {
-    incident_id: number;
-    generated_at: string;
-    report_title: string;
-    executive_summary: string;
-    event_timeline: string[];
-    ai_risk_assessment: string;
-    recommended_containment: string[];
-  };
-  onClose: () => void;
+interface LegacyReportData {
+  incident_id: number;
+  generated_at: string;
+  report_title: string;
+  executive_summary: string;
+  event_timeline: string[];
+  ai_risk_assessment: string;
+  recommended_containment: string[];
 }
 
-export function ReportModal({ report, onClose }: ReportModalProps) {
+interface ReportModalProps {
+  report: ReportResponse | LegacyReportData | any;
+  onClose: () => void;
+  onReportUpdated?: (updated: ReportResponse) => void;
+}
+
+export function ReportModal({ report, onClose, onReportUpdated }: ReportModalProps) {
+  // If modern Phase 7 ReportResponse with sections is passed, render EvidenceGroundedReportViewer
+  if (report && 'sections' in report && report.sections) {
+    return (
+      <EvidenceGroundedReportViewer
+        initialReport={report as ReportResponse}
+        onClose={onClose}
+        onReportUpdated={onReportUpdated}
+      />
+    );
+  }
+
   const handlePrint = () => {
     window.print();
   };
@@ -85,7 +101,7 @@ export function ReportModal({ report, onClose }: ReportModalProps) {
             3. Chronological Evidence Timeline
           </h3>
           <ul className="space-y-2 text-xs sm:text-sm text-[#3E384D]">
-            {report.event_timeline.map((item, idx) => (
+            {(report.event_timeline || []).map((item: string, idx: number) => (
               <li key={idx} className="p-3 rounded-lg bg-[#FAF9FD] border border-[#E5E1EE] flex items-center space-x-2">
                 <span className="w-2 h-2 rounded-full bg-[#7C5CFC]" />
                 <span>{item}</span>
@@ -100,7 +116,7 @@ export function ReportModal({ report, onClose }: ReportModalProps) {
             4. Recommended Containment Strategies
           </h3>
           <ul className="space-y-2 text-xs sm:text-sm text-[#3E384D]">
-            {report.recommended_containment.map((item, idx) => (
+            {(report.recommended_containment || []).map((item: string, idx: number) => (
               <li key={idx} className="flex items-start space-x-2">
                 <CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" />
                 <span>{item}</span>

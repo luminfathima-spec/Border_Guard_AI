@@ -1,5 +1,6 @@
 import datetime
 from sqlalchemy.orm import Session
+from app.core.config import settings
 from app.core.logging import logger
 from app.core.security import get_password_hash
 from app.models.user import User, UserRole
@@ -10,48 +11,95 @@ from app.models.incident import Incident, IncidentStatus
 
 def init_db(db: Session) -> None:
     """
-    Ensures default administrative, analyst, and operator accounts are seeded with verified password hashes.
-    Also initializes default border cameras and sample threat dossiers if table is empty.
+    Initializes application database with required base state.
+    
+    SECURITY SAFEGUARDS:
+    1. In production (APP_ENV in 'production', 'prod', 'staging'), hardcoded default
+       demo credentials (AdminPassword123!) are NEVER seeded unless explicitly opted in
+       via ALLOW_DEFAULT_CREDENTIALS_IN_PRODUCTION=True.
+    2. If INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD are provided in production,
+       an initial administrator account is securely bootstrapped.
+    3. Existing user passwords are NEVER silently overwritten on restart, preserving
+       credential changes made by users.
     """
-    # 1. Seed Users
-    default_users = [
-        {
-            "name": "General Commander A. Sharma",
-            "email": "admin@sentinel.ai",
-            "password": "AdminPassword123!",
-            "role": UserRole.ADMIN.value,
-        },
-        {
-            "name": "Senior Analyst Priya Verma",
-            "email": "analyst@sentinel.ai",
-            "password": "AnalystPassword123!",
-            "role": UserRole.SECURITY_ANALYST.value,
-        },
-        {
-            "name": "Field Operator R. Singh",
-            "email": "operator@sentinel.ai",
-            "password": "OperatorPassword123!",
-            "role": UserRole.OPERATOR.value,
-        },
-    ]
+    is_production = settings.APP_ENV.lower() in ("production", "prod", "staging")
+    allow_demo_in_prod = getattr(settings, "ALLOW_DEFAULT_CREDENTIALS_IN_PRODUCTION", False)
 
-    for user_info in default_users:
-        existing_user = db.query(User).filter(User.email == user_info["email"]).first()
-        if not existing_user:
-            user = User(
-                name=user_info["name"],
-                email=user_info["email"],
-                password_hash=get_password_hash(user_info["password"]),
-                role=user_info["role"],
-                is_active=True,
-            )
-            db.add(user)
-            logger.info(f"Seeded user: {user_info['email']} ({user_info['role']})")
+    # 1. User Account Seeding
+    if is_production and not allow_demo_in_prod:
+        admin_exists = db.query(User).filter(User.role == UserRole.ADMIN.value).first()
+        if not admin_exists:
+            initial_email = getattr(settings, "INITIAL_ADMIN_EMAIL", None)
+            initial_pass = getattr(settings, "INITIAL_ADMIN_PASSWORD", None)
+            if initial_email and initial_pass:
+                if len(initial_pass) < 12:
+                    logger.warning(
+                        "INITIAL_ADMIN_PASSWORD is shorter than 12 characters. "
+                        "A stronger password is recommended for production administrators."
+                    )
+                new_admin = User(
+                    name="Production Administrator",
+                    email=initial_email.strip(),
+                    password_hash=get_password_hash(initial_pass),
+                    role=UserRole.ADMIN.value,
+                    is_active=True,
+                )
+                db.add(new_admin)
+                logger.info(f"Initialized production administrator: {initial_email.strip()} (ADMIN)")
+            else:
+                logger.warning(
+                    "PRODUCTION ENVIRONMENT: No administrator account exists and default demo credentials "
+                    "are disabled. Set INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD to bootstrap the initial admin."
+                )
         else:
-            # Refresh password hash to ensure credentials match
-            existing_user.password_hash = get_password_hash(user_info["password"])
-            existing_user.is_active = True
-            db.add(existing_user)
+            logger.info("Production administrator account already exists. Skipping user bootstrapping.")
+    else:
+        # Development / Testing: Seed Default Users
+        default_users = [
+            {
+                "name": "General Commander A. Sharma",
+                "email": "admin@sentinel.ai",
+                "password": "AdminPassword123!",
+                "role": UserRole.ADMIN.value,
+            },
+            {
+                "name": "Senior Analyst Priya Verma",
+                "email": "analyst@sentinel.ai",
+                "password": "AnalystPassword123!",
+                "role": UserRole.SECURITY_ANALYST.value,
+            },
+            {
+                "name": "Field Operator R. Singh",
+                "email": "operator@sentinel.ai",
+                "password": "OperatorPassword123!",
+                "role": UserRole.OPERATOR.value,
+            },
+            {
+                "name": "Command Center Observer",
+                "email": "viewer@sentinel.ai",
+                "password": "ViewerPassword123!",
+                "role": UserRole.VIEWER.value,
+            },
+        ]
+
+        for user_info in default_users:
+            existing_user = db.query(User).filter(User.email == user_info["email"]).first()
+            if not existing_user:
+                user = User(
+                    name=user_info["name"],
+                    email=user_info["email"],
+                    password_hash=get_password_hash(user_info["password"]),
+                    role=user_info["role"],
+                    is_active=True,
+                )
+                db.add(user)
+                logger.info(f"Seeded user: {user_info['email']} ({user_info['role']})")
+            else:
+                # Do NOT overwrite existing user's password if already set!
+                if not existing_user.password_hash:
+                    existing_user.password_hash = get_password_hash(user_info["password"])
+                    existing_user.is_active = True
+                    db.add(existing_user)
 
     db.commit()
 
